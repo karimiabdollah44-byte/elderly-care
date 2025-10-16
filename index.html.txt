@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="manifest.json">
+    <title>مراقبت سالمندان</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { font-family: Tahoma, Arial; overscroll-behavior: none; }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app"></div>
+    <script>
+        class ElderlyCarePWA {
+            constructor() {
+                this.currentPage = 'profile';
+                this.menuOpen = false;
+                this.loadData();
+                this.init();
+                this.registerServiceWorker();
+            }
+            
+            loadData() {
+                this.userData = JSON.parse(localStorage.getItem('elderlyUserData')) || {
+                    name: 'محمد رضایی', age: 72, birthDate: '1331/05/15',
+                    gender: 'مرد', maritalStatus: 'متأهل', livingWith: 'با همسر',
+                    phone: '09121234567', emergencyContact: '09121234567',
+                    medicalHistory: ['فشار خون بالا', 'دیابت نوع 2', 'آرتروز'],
+                    medicines: [
+                        { name: 'متفورمین', dose: '500mg', time: 'صبح و شب', id: 1 },
+                        { name: 'آتورواستاتین', dose: '20mg', time: 'شب', id: 2 }
+                    ]
+                };
+                this.nutritionData = JSON.parse(localStorage.getItem('elderlyNutrition')) || {
+                    waterIntake: 6, waterGoal: 8,
+                    meals: [
+                        { type: 'صبحانه', time: '08:00', items: ['نان سبوس‌دار', 'پنیر', 'گردو'], completed: true },
+                        { type: 'ناهار', time: '13:00', items: ['برنج', 'ماهی', 'سالاد'], completed: false },
+                        { type: 'شام', time: '19:00', items: ['سوپ', 'نان', 'سبزی'], completed: false }
+                    ]
+                };
+                this.mentalHealth = JSON.parse(localStorage.getItem('elderlyMental')) || {
+                    moodScore: 75,
+                    exercises: [
+                        { title: 'تنفس عمیق', duration: '5 دقیقه', completed: true },
+                        { title: 'بازی حافظه', duration: '10 دقیقه', completed: false }
+                    ]
+                };
+                this.safetyData = JSON.parse(localStorage.getItem('elderlySafety')) || {
+                    checklist: [
+                        { item: 'نور شبانه', checked: true },
+                        { item: 'ضد لغزش حمام', checked: true },
+                        { item: 'دستگیره کمکی', checked: false }
+                    ]
+                };
+            }
+            
+            saveData() {
+                localStorage.setItem('elderlyUserData', JSON.stringify(this.userData));
+                localStorage.setItem('elderlyNutrition', JSON.stringify(this.nutritionData));
+                localStorage.setItem('elderlyMental', JSON.stringify(this.mentalHealth));
+                localStorage.setItem('elderlySafety', JSON.stringify(this.safetyData));
+            }
+            
+            init() { this.render(); }
+            
+            registerServiceWorker() {
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.register('sw.js');
+                }
+            }
+            
+            render() {
+                document.getElementById('app').innerHTML = `
+                    ${this.renderHeader()}
+                    ${this.renderMenu()}
+                    <main class="max-w-6xl mx-auto p-4 pb-24 fade-in">
+                        ${this.renderPage()}
+                    </main>
+                    ${this.renderBottomNav()}
+                `;
+                lucide.createIcons();
+            }
+            
+            renderHeader() {
+                return `
+                    <header class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 sticky top-0 z-50">
+                        <div class="flex items-center justify-between max-w-6xl mx-auto">
+                            <button onclick="app.toggleMenu()" class="p-2 hover:bg-white/20 rounded-lg">
+                                <i data-lucide="${this.menuOpen ? 'x' : 'menu'}" class="w-6 h-6"></i>
+                            </button>
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="heart" class="w-8 h-8"></i>
+                                <h1 class="text-xl font-bold">مراقبت سالمند</h1>
+                            </div>
+                            <i data-lucide="bell" class="w-6 h-6"></i>
+                        </div>
+                    </header>
+                `;
+            }
+            
+            renderMenu() {
+                if (!this.menuOpen) return '';
+                const pages = [
+                    { id: 'profile', name: 'پروفایل', icon: 'user' },
+                    { id: 'nutrition', name: 'تغذیه', icon: 'apple' },
+                    { id: 'mental', name: 'سلامت روان', icon: 'brain' },
+                    { id: 'safety', name: 'ایمنی', icon: 'shield' }
+                ];
+                return `
+                    <div class="fixed inset-0 bg-black/50 z-40" onclick="app.toggleMenu()">
+                        <div class="absolute right-0 top-0 bottom-0 w-80 bg-white p-6" onclick="event.stopPropagation()">
+                            <h2 class="text-2xl font-bold mb-6">منوی اصلی</h2>
+                            <nav class="space-y-2">
+                                ${pages.map(p => `
+                                    <button onclick="app.navigateTo('${p.id}')" 
+                                        class="w-full flex items-center gap-3 p-4 rounded-xl ${
+                                            this.currentPage === p.id ? 'bg-blue-600 text-white' : 'bg-gray-100'
+                                        }">
+                                        <i data-lucide="${p.icon}" class="w-5 h-5"></i>
+                                        <span>${p.name}</span>
+                                    </button>
+                                `).join('')}
+                            </nav>
+                            <div class="mt-8 pt-6 border-t">
+                                <button onclick="app.exportData()" class="w-full bg-green-600 text-white p-3 rounded-lg mb-2">
+                                    <i data-lucide="download" class="w-4 h-4 inline ml-2"></i>
+                                    دریافت پشتیبان
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            renderPage() {
+                const pages = {
+                    profile: this.renderProfile(),
+                    nutrition: this.renderNutrition(),
+                    mental: this.renderMental(),
+                    safety: this.renderSafety()
+                };
+                return pages[this.currentPage];
+            }
+            
+            renderProfile() {
+                return `
+                    <div class="space-y-6">
+                        <div class="bg-gradient-to-br from-blue-500 to-purple-600 text-white p-6 rounded-2xl">
+                            <div class="flex items-center gap-4 mb-4">
+                                <div class="w-20 h-20 bg-white rounded-full flex items-center justify-center">
+                                    <i data-lucide="user" class="w-12 h-12 text-blue-600"></i>
+                                </div>
+                                <div>
+                                    <h2 class="text-2xl font-bold">${this.userData.name}</h2>
+                                    <p class="text-blue-100">${this.userData.age} ساله</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow">
+                            <h3 class="text-xl font-bold mb-4">سوابق پزشکی</h3>
+                            ${this.userData.medicalHistory.map(h => `
+                                <div class="flex gap-2 p-3 bg-red-50 rounded-lg mb-2">
+                                    <i data-lucide="check" class="w-5 h-5 text-red-600"></i>
+                                    <span>${h}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow">
+                            <h3 class="text-xl font-bold mb-4">داروهای مصرفی</h3>
+                            ${this.userData.medicines.map(m => `
+                                <div class="p-4 bg-blue-50 rounded-lg border-r-4 border-blue-600 mb-3">
+                                    <h4 class="font-bold">${m.name}</h4>
+                                    <div class="flex justify-between mt-2 text-sm text-gray-600">
+                                        <span>دوز: ${m.dose}</span>
+                                        <span>زمان: ${m.time}</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            renderNutrition() {
+                const waterPercent = Math.round((this.nutritionData.waterIntake / this.nutritionData.waterGoal) * 100);
+                return `
+                    <div class="space-y-6">
+                        <div class="bg-gradient-to-br from-orange-500 to-red-600 text-white p-6 rounded-2xl">
+                            <h2 class="text-2xl font-bold">تغذیه سالم</h2>
+                            <p class="text-orange-100">برنامه غذایی شما</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow">
+                            <h3 class="text-xl font-bold mb-4">وعده‌های امروز</h3>
+                            ${this.nutritionData.meals.map((m, i) => `
+                                <div onclick="app.toggleMeal(${i})" 
+                                    class="p-4 rounded-lg border-r-4 mb-3 cursor-pointer ${
+                                        m.completed ? 'bg-green-50 border-green-600' : 'bg-orange-50 border-orange-600'
+                                    }">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <h4 class="font-bold">${m.type}</h4>
+                                        ${m.completed ? '<i data-lucide="check" class="w-5 h-5 text-green-600"></i>' : ''}
+                                    </div>
+                                    <p class="text-sm text-gray-600">${m.time}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow">
+                            <h3 class="text-xl font-bold mb-4">مصرف آب</h3>
+                            <div class="flex justify-between mb-2">
+                                <span>${this.nutritionData.waterIntake} از ${this.nutritionData.waterGoal} لیوان</span>
+                                <span class="text-blue-600 font-bold">${waterPercent}%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-4 mb-4">
+                                <div class="bg-blue-600 h-4 rounded-full" style="width: ${waterPercent}%"></div>
+                            </div>
+                            <div class="flex gap-3">
+                                <button onclick="app.updateWater(1)" class="flex-1 bg-blue-600 text-white p-3 rounded-xl font-bold">
+                                    + لیوان
+                                </button>
+                                <button onclick="app.updateWater(-1)" class="flex-1 bg-gray-300 p-3 rounded-xl font-bold">
+                                    - لیوان
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            renderMental() {
+                return `
+                    <div class="space-y-6">
+                        <div class="bg-gradient-to-br from-purple-500 to-pink-600 text-white p-6 rounded-2xl">
+                            <h2 class="text-2xl font-bold">سلامت روان</h2>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow text-center">
+                            <h3 class="text-xl font-bold mb-4">شاخص روحیه</h3>
+                            <div class="inline-flex items-center justify-center w-32 h-32 rounded-full bg-gradient-to-br from-green-400 to-blue-500 text-white text-4xl font-bold">
+                                ${this.mentalHealth.moodScore}
+                            </div>
+                            <p class="mt-4 text-gray-600">روحیه خوب!</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow">
+                            <h3 class="text-xl font-bold mb-4">تمرین‌های روزانه</h3>
+                            ${this.mentalHealth.exercises.map((e, i) => `
+                                <div onclick="app.toggleExercise(${i})" 
+                                    class="p-4 rounded-lg border-r-4 mb-3 cursor-pointer flex justify-between ${
+                                        e.completed ? 'bg-green-50 border-green-600' : 'bg-gray-50 border-gray-400'
+                                    }">
+                                    <div>
+                                        <h4 class="font-semibold">${e.title}</h4>
+                                        <p class="text-sm text-gray-600">${e.duration}</p>
+                                    </div>
+                                    ${e.completed ? '<i data-lucide="check" class="w-6 h-6 text-green-600"></i>' : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            renderSafety() {
+                return `
+                    <div class="space-y-6">
+                        <div class="bg-gradient-to-br from-yellow-500 to-orange-600 text-white p-6 rounded-2xl">
+                            <h2 class="text-2xl font-bold">ایمنی منزل</h2>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow">
+                            <h3 class="text-xl font-bold mb-4">چک‌لیست ایمنی</h3>
+                            ${this.safetyData.checklist.map((item, i) => `
+                                <div onclick="app.toggleSafety(${i})" 
+                                    class="flex justify-between p-3 bg-gray-50 rounded-lg mb-2 cursor-pointer">
+                                    <span>${item.item}</span>
+                                    <div class="w-6 h-6 rounded-md flex items-center justify-center ${
+                                        item.checked ? 'bg-green-600' : 'bg-gray-300'
+                                    }">
+                                        ${item.checked ? '<i data-lucide="check" class="w-4 h-4 text-white"></i>' : ''}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            renderBottomNav() {
+                const pages = [
+                    { id: 'profile', icon: 'user', name: 'پروفایل' },
+                    { id: 'nutrition', icon: 'apple', name: 'تغذیه' },
+                    { id: 'mental', icon: 'brain', name: 'روان' },
+                    { id: 'safety', icon: 'shield', name: 'ایمنی' }
+                ];
+                return `
+                    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-30">
+                        <div class="flex justify-around p-3">
+                            ${pages.map(p => `
+                                <button onclick="app.navigateTo('${p.id}')" 
+                                    class="flex flex-col items-center gap-1 p-2 ${
+                                        this.currentPage === p.id ? 'text-blue-600' : 'text-gray-500'
+                                    }">
+                                    <i data-lucide="${p.icon}" class="w-6 h-6"></i>
+                                    <span class="text-xs">${p.name}</span>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </nav>
+                `;
+            }
+            
+            toggleMenu() { this.menuOpen = !this.menuOpen; this.render(); }
+            navigateTo(page) { this.currentPage = page; this.menuOpen = false; this.render(); window.scrollTo(0, 0); }
+            toggleMeal(i) { this.nutritionData.meals[i].completed = !this.nutritionData.meals[i].completed; this.saveData(); this.render(); }
+            updateWater(amount) {
+                const newValue = this.nutritionData.waterIntake + amount;
+                if (newValue >= 0 && newValue <= this.nutritionData.waterGoal) {
+                    this.nutritionData.waterIntake = newValue;
+                    this.saveData();
+                    this.render();
+                }
+            }
+            toggleExercise(i) { this.mentalHealth.exercises[i].completed = !this.mentalHealth.exercises[i].completed; this.saveData(); this.render(); }
+            toggleSafety(i) { this.safetyData.checklist[i].checked = !this.safetyData.checklist[i].checked; this.saveData(); this.render(); }
+            exportData() {
+                const data = JSON.stringify({
+                    userData: this.userData,
+                    nutritionData: this.nutritionData,
+                    mentalHealth: this.mentalHealth,
+                    safetyData: this.safetyData,
+                    exportDate: new Date().toISOString()
+                }, null, 2);
+                const blob = new Blob([data], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `backup-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                alert('پشتیبان ذخیره شد!');
+            }
+        }
+        
+        let app;
+        window.addEventListener('DOMContentLoaded', () => { app = new ElderlyCarePWA(); });
+        
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const div = document.createElement('div');
+            div.className = 'fixed bottom-24 left-4 right-4 bg-green-600 text-white p-4 rounded-xl shadow-lg z-50';
+            div.innerHTML = `
+                <p class="font-bold mb-2">نصب اپلیکیشن</p>
+                <button id="installBtn" class="bg-white text-green-600 px-4 py-2 rounded-lg font-bold">نصب</button>
+                <button id="dismissBtn" class="bg-white/20 px-4 py-2 rounded-lg mr-2">بعداً</button>
+            `;
+            document.body.appendChild(div);
+            document.getElementById('installBtn').onclick = async () => {
+                deferredPrompt.prompt();
+                await deferredPrompt.userChoice;
+                div.remove();
+            };
+            document.getElementById('dismissBtn').onclick = () => div.remove();
+        });
+    </script>
+</body>
+</html>
